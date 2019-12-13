@@ -29,8 +29,10 @@ const Version = "1.0.0"
 type GitLabBootstrapOptions struct {
 	ConfigFlags *genericclioptions.ConfigFlags
 
-	GitLabAPIToken  string
-	GitLabProjectID string
+	GitLabAPIToken     string
+	GitLabProjectID    string
+	GitLabURL          string
+	GitLabGroupCluster bool
 
 	KubeConfig    string
 	RestConfig    *restclient.Config
@@ -79,6 +81,8 @@ func NewCmdGitLabBootstrap(streams genericclioptions.IOStreams) *cobra.Command {
 	}
 
 	cmd.Flags().StringVar(&o.GitLabAPIToken, "gitlab-api-token", "", "Private token from GitLab. Pulled from env[\"GITLAB_API_TOKEN\"] if not provided")
+	cmd.Flags().StringVar(&o.GitLabURL, "gitlab-url", "", "Set to override default connection to GitLab")
+	cmd.Flags().BoolVar(&o.GitLabGroupCluster, "gitlab-use-group", false, "Add the cluster to the group identified by the id rather than a project")
 	o.ConfigFlags.AddFlags(cmd.Flags())
 
 	return cmd
@@ -146,9 +150,21 @@ func (o *GitLabBootstrapOptions) Validate() error {
 		return fmt.Errorf("GitLab project id is required")
 	}
 	o.GitLabAPI = gitlab.NewClient(nil, o.GitLabAPIToken)
-	_, _, err := o.GitLabAPI.Projects.GetProject(o.GitLabProjectID, nil)
-	if err != nil {
-		return errors.Wrap(err, "unable to get GitLab project")
+
+	if o.GitLabURL != "" {
+		o.GitLabAPI.SetBaseURL(o.GitLabURL)
+	}
+
+	if (o.GitLabGroupCluster) {
+		_, _, err := o.GitLabAPI.Groups.GetGroup(o.GitLabProjectID, nil)
+		if err != nil {
+			return errors.Wrap(err, "unable to get GitLab group")
+		}
+	} else {
+		_, _, err := o.GitLabAPI.Projects.GetProject(o.GitLabProjectID, nil)
+		if err != nil {
+			return errors.Wrap(err, "unable to get GitLab project")
+		}
 	}
 
 	return nil
@@ -165,7 +181,7 @@ func (o *GitLabBootstrapOptions) Run() error {
 	if err := o.SaveServiceAccountToken(); err != nil {
 		return err
 	}
-	if err := o.AddClusterToProject(); err != nil {
+	if err := o.AddClusterToGitLab(); err != nil {
 		return err
 	}
 	return nil
@@ -174,11 +190,17 @@ func (o *GitLabBootstrapOptions) Run() error {
 // CreateServiceAccount creates the gitlab-admin ServiceAccount
 func (o *GitLabBootstrapOptions) CreateServiceAccount() error {
 	sai := o.KubeClientSet.CoreV1().ServiceAccounts("kube-system")
-	saSpec := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "gitlab-admin"}}
-	_, err := sai.Create(saSpec)
+	_, err := sai.Get("gitlab-admin", metav1.GetOptions{})
 	if err != nil {
-		return errors.Wrap(err, "unable to create service account")
+		saSpec := &v1.ServiceAccount{ObjectMeta: metav1.ObjectMeta{Name: "gitlab-admin"}}
+		_, err := sai.Create(saSpec)
+		if err != nil {
+			return errors.Wrap(err, "unable to create service account")
+		}
+	} else {
+		fmt.Println("Using existing gitlab-admin account")
 	}
+
 	return nil
 }
 
@@ -194,10 +216,17 @@ func (o *GitLabBootstrapOptions) CreateClusterRoleBinding() error {
 		Kind: "ClusterRole",
 	}
 	crbSpec := &rbacv1.ClusterRoleBinding{ObjectMeta: metav1.ObjectMeta{Name: "gitlab-admin"}, Subjects: []rbacv1.Subject{crbSubject}, RoleRef: roleRef}
-	_, err := o.KubeClientSet.RbacV1().ClusterRoleBindings().Create(crbSpec)
+	_, err := o.KubeClientSet.RbacV1().ClusterRoleBindings().Get("gitlab-admin", metav1.GetOptions{})
 	if err != nil {
-		return errors.Wrap(err, "unable to create clusterrolebinding")
+		_, err := o.KubeClientSet.RbacV1().ClusterRoleBindings().Create(crbSpec)
+		if err != nil {
+			return errors.Wrap(err, "unable to create clusterrolebinding")
+		}
+		return nil
+	} else {
+		fmt.Println("Using existing clusterrolebinding")
 	}
+
 	return nil
 }
 
@@ -234,7 +263,41 @@ func (o *GitLabBootstrapOptions) SaveServiceAccountToken() error {
 }
 
 // AddClusterToProject adds the Kubernetes cluster to the GitLab project
-func (o *GitLabBootstrapOptions) AddClusterToProject() error {
+func (o *GitLabBootstrapOptions) AddClusterToGitLab() error {
+
+  if (o.GitLabGroupCluster) {
+		if err := o.addClusterToGroup(); err != nil {
+			return err
+		}
+	} else {
+		if err := o.addClusterToProject(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (o *GitLabBootstrapOptions) addClusterToGroup() error {
+	clusterOpts := &gitlab.AddGroupClusterOptions{
+		Name:             &o.ClusterName,
+		EnvironmentScope: gitlab.String("*"),
+		PlatformKubernetes: &gitlab.AddGroupPlatformKubernetesOptions{
+			APIURL: &o.ClusterHost,
+			Token:  &o.ServiceAccountToken,
+			CaCert: &o.ClusterCA,
+		},
+	}
+	gc, _, err := o.GitLabAPI.GroupCluster.AddCluster(o.GitLabProjectID, clusterOpts)
+	if err != nil {
+		return errors.Wrap(err, "unable to assign kubernetes cluster to group")
+	}
+	gitlabClusterURL := fmt.Sprintf("%s/clusters/%d", gc.Group.WebURL, gc.ID)
+	fmt.Println("Cluster successfully added to group!")
+	fmt.Printf("To finish up visit: %s and install Helm and Runner.\n", gitlabClusterURL)
+	return nil
+}
+
+func (o *GitLabBootstrapOptions) addClusterToProject() error {
 	clusterOpts := &gitlab.AddClusterOptions{
 		Name:             &o.ClusterName,
 		EnvironmentScope: gitlab.String("*"),
@@ -246,7 +309,7 @@ func (o *GitLabBootstrapOptions) AddClusterToProject() error {
 	}
 	pc, _, err := o.GitLabAPI.ProjectCluster.AddCluster(o.GitLabProjectID, clusterOpts)
 	if err != nil {
-		return errors.Wrap(err, "unable to add project to cluster")
+		return errors.Wrap(err, "unable to assign kubernetes cluster to project")
 	}
 	gitlabClusterURL := fmt.Sprintf("%s/clusters/%d", pc.Project.WebURL, pc.ID)
 	fmt.Println("Cluster successfully added to project!")
