@@ -155,7 +155,7 @@ func (o *GitLabBootstrapOptions) Validate() error {
 		o.GitLabAPI.SetBaseURL(o.GitLabURL)
 	}
 
-	if (o.GitLabGroupCluster) {
+	if o.GitLabGroupCluster {
 		_, _, err := o.GitLabAPI.Groups.GetGroup(o.GitLabProjectID, nil)
 		if err != nil {
 			return errors.Wrap(err, "unable to get GitLab group")
@@ -223,9 +223,9 @@ func (o *GitLabBootstrapOptions) CreateClusterRoleBinding() error {
 			return errors.Wrap(err, "unable to create clusterrolebinding")
 		}
 		return nil
-	} else {
-		fmt.Println("Using existing clusterrolebinding")
 	}
+
+	fmt.Println("Using existing clusterrolebinding")
 
 	return nil
 }
@@ -262,10 +262,10 @@ func (o *GitLabBootstrapOptions) SaveServiceAccountToken() error {
 	return nil
 }
 
-// AddClusterToProject adds the Kubernetes cluster to the GitLab project
+// AddClusterToGitLab adds the Kubernetes cluster to the GitLab project
 func (o *GitLabBootstrapOptions) AddClusterToGitLab() error {
 
-  if (o.GitLabGroupCluster) {
+	if o.GitLabGroupCluster {
 		if err := o.addClusterToGroup(); err != nil {
 			return err
 		}
