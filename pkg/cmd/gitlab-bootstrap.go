@@ -99,6 +99,10 @@ func (o *GitLabBootstrapOptions) Complete(cmd *cobra.Command, args []string) err
 		o.GitLabAPIToken = os.Getenv("GITLAB_API_TOKEN")
 	}
 
+	if os.Getenv("GITLAB_URL") != "" {
+		o.GitLabURL = os.Getenv("GITLAB_URL")
+	}
+
 	// Grab KubeConfig from flag or home dir
 	if *o.ConfigFlags.KubeConfig != "" {
 		o.KubeConfig = *o.ConfigFlags.KubeConfig
