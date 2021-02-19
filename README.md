@@ -1,4 +1,8 @@
-# kubectl-gitlab_bootstrap
+## This is fork of [eddiezane/kubectl-gitlab_bootstrap](https://gitlab.com/eddiezane/kubectl-gitlab_bootstrap)
+
+With the release hosted gitlab issue resolved. See [Issue](https://gitlab.com/gitlab-org/gitlab/-/issues/36691)
+
+## kubectl-gitlab_bootstrap
 
 This is a [kubectl plugin](https://kubernetes.io/docs/tasks/extend-kubectl/kubectl-plugins/) that makes adding a Kubernetes cluster to a GitLab project a breeze.
 
@@ -8,7 +12,7 @@ The plugin will use the cluster set as your current context to create a ServiceA
 
 ## Installation
 
-Download the [latest release binary](https://gitlab.com/eddiezane/kubectl-gitlab_bootstrap/-/releases) and place in `$PATH` (probably `/usr/local/bin`).
+Download the [latest release binary](https://github.com/fastengineer/kubectl-gitlab_bootstrap/files/6007092/kubectl-gitlab_bootstrap.zip) and place in `$PATH` (probably `/usr/local/bin`).
 
 ## Usage
 
@@ -28,12 +32,10 @@ MIT
 Clone the repository
 
 `go mod download`
-
 `go get github.com/fastengineer/kubectl-gitlab_bootstrap/pkg/cmd`
-
 `go run cmd/kubectl-gitlab_bootstrap.go`
-
 `go build cmd/kubectl-gitlab_bootstrap.go`
+`env GOOS=linux go build cmd/kubectl-gitlab_bootstrap.go`
 
 Example usage:
 
