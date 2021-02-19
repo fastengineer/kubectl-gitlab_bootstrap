@@ -5,7 +5,7 @@ import (
 
 	"github.com/spf13/pflag"
 
-	"gitlab.com/eddiezane/kubectl-gitlab_bootstrap/pkg/cmd"
+	"github.com/fastengineer/kubectl-gitlab_bootstrap/pkg/cmd"
 	"k8s.io/cli-runtime/pkg/genericclioptions"
 )
 
