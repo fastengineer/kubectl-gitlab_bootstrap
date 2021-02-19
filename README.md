@@ -24,10 +24,17 @@ To finish up visit: https://gitlab.com/eddiezane/kubectl-gitlab_bootstrap/cluste
 MIT
 
 ## Development
+
 Clone the repository
+
 `go mod download`
+
 `go get github.com/fastengineer/kubectl-gitlab_bootstrap/pkg/cmd`
+
 `go run cmd/kubectl-gitlab_bootstrap.go`
+
 `go build cmd/kubectl-gitlab_bootstrap.go`
+
 Example usage:
+
 `go run cmd/kubectl-gitlab_bootstrap.go 2 --gitlab-api-token 20chartokenhere16192 --insecure-skip-tls-verify --kubeconfig config`
