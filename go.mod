@@ -1,4 +1,4 @@
-module gitlab.com/eddiezane/kubectl-gitlab_bootstrap
+module github.com/fastengineer/kubectl-gitlab_bootstrap
 
 go 1.12
 
